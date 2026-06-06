@@ -86,7 +86,7 @@ export default function Dashboard({ navigate }) {
     <div>
       <div className="page-header">
         <div>
-          <div className="breadcrumb"><span>NEXUS</span><span>/</span><span>Dashboard</span></div>
+          <div className="breadcrumb"><span>IoT</span><span>/</span><span>Dashboard</span></div>
           <div className="page-title">System <span>Overview</span></div>
           <div className="page-sub">Real-time IoT infrastructure monitoring</div>
         </div>

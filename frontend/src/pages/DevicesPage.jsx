@@ -35,7 +35,7 @@ export default function DevicesPage({ navigate }) {
     <div>
       <div className="page-header">
         <div>
-          <div className="breadcrumb"><span>NEXUS</span><span>/</span><span>Devices</span></div>
+          <div className="breadcrumb"><span>IoT</span><span>/</span><span>Devices</span></div>
           <div className="page-title">Device <span>Registry</span></div>
           <div className="page-sub">{devices.length} registered endpoints</div>
         </div>

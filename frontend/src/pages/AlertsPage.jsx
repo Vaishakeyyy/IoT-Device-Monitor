@@ -12,24 +12,22 @@ export default function AlertsPage() {
     setError(null);
     try {
       const params = filter === "unacked" ? { acknowledged: false } : filter === "acked" ? { acknowledged: true } : {};
-      const [alertResp, deviceResp] = await Promise.all([api.getAlerts(params), api.getDevices()]);
-      const actualAlerts = alertResp.data || [];
-      const deviceAlerts = deviceResp.data
-        .filter((d) => d.status && d.status !== "online")
-        .map((d) => ({
-          id: `device-status-${d.device_id}`,
-          device_id: d.device_id,
-          device_name: d.name,
-          location: d.location,
-          severity: d.status,
-          message: `Device status is ${d.status}`,
-          acknowledged: false,
-          created_at: d.last_seen || new Date().toISOString(),
-          synthetic: true,
-        }));
+      const alertResp = await api.getAlerts(params);
+      const apiAlerts = (alertResp.data || []).map((a) => {
+        if (a.id == null) {
+          return {
+            ...a,
+            id: `device-status-${a.device_id}`,
+            device_name: a.device_name || a.device_id,
+            created_at: a.created_at || new Date().toISOString(),
+            acknowledged: !!a.acknowledged,
+            synthetic: true,
+          };
+        }
+        return a;
+      });
 
-      const combined = filter === "acked" ? actualAlerts : [...deviceAlerts, ...actualAlerts];
-      setAlerts(combined);
+      setAlerts(filter === "acked" ? apiAlerts.filter((a) => a.acknowledged) : apiAlerts);
     } catch (e) {
       console.error(e);
       setAlerts([]);
@@ -92,7 +90,7 @@ export default function AlertsPage() {
     <div>
       <div className="page-header">
         <div>
-          <div className="breadcrumb"><span>NEXUS</span><span>/</span><span>Alerts</span></div>
+          <div className="breadcrumb"><span>IoT</span><span>/</span><span>Alerts</span></div>
           <div className="page-title">Alert <span>Center</span></div>
           <div className="page-sub">{alerts.length} alerts</div>
         </div>
