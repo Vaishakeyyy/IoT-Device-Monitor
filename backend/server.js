@@ -1,4 +1,5 @@
 require("dotenv").config();
+const os = require("os");
 const express = require("express");
 const cors = require("cors");
 const http = require("http");
@@ -36,6 +37,15 @@ app.use("/api/alerts", require("./routes/alerts"));
 
 // Health check
 app.get("/api/health", (req, res) => res.json({ status: "ok", timestamp: new Date() }));
+
+app.get("/api/network", (req, res) => {
+  const interfaces = Object.entries(os.networkInterfaces()).flatMap(([name, nets]) =>
+    nets
+      .filter((net) => net.family === "IPv4" && !net.internal)
+      .map((net) => ({ interface: name, address: net.address }))
+  );
+  res.json({ success: true, interfaces });
+});
 
 app.get("/api/test", (req, res) => {
   res.json({

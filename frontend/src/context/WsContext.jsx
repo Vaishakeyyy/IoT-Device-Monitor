@@ -9,7 +9,10 @@ export function WsProvider({ children }) {
   const listeners = useRef([]);
 
   const connect = useCallback(() => {
-    const url = "ws://10.150.253.172:5000/ws";
+    const host = window.location.hostname || "localhost";
+    const port = 5000;
+    const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+    const url = `${protocol}://${host}:${port}/ws`;
     const socket = new WebSocket(url);
     ws.current = socket;
 

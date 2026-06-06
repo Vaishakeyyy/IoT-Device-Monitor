@@ -9,17 +9,19 @@ export default function Dashboard({ navigate }) {
   const [alerts, setAlerts] = useState([]);
   const [liveFeed, setLiveFeed] = useState([]);
   const [stats, setStats] = useState([]);
+  const [networkInterfaces, setNetworkInterfaces] = useState([]);
   const { connected, subscribe } = useWs();
 
   const loadData = useCallback(async () => {
     try {
-      const [s, d, a, st] = await Promise.all([
-        api.getSummary(), api.getDevices(), api.getAlerts({ acknowledged: false }), api.getStats()
+      const [s, d, a, st, net] = await Promise.all([
+        api.getSummary(), api.getDevices(), api.getAlerts({ acknowledged: false }), api.getStats(), api.getNetwork()
       ]);
       setSummary(s.data);
       setDevices(d.data.slice(0, 6));
       setAlerts(a.data.slice(0, 5));
       setStats(st.data);
+      setNetworkInterfaces(net.interfaces ?? []);
     } catch (e) { console.error(e); }
   }, []);
 
@@ -68,6 +70,24 @@ export default function Dashboard({ navigate }) {
           <StatCard label="Online" value={summary?.online ?? "—"} desc="Actively reporting" color="green" />
           <StatCard label="Warnings" value={(summary?.warning ?? 0) + (summary?.critical ?? 0)} desc="Need attention" color="yellow" />
           <StatCard label="Readings / 24h" value={summary?.readings_24h ?? "—"} desc="Data points ingested" color="accent" />
+        </div>
+
+        <div className="card" style={{ marginBottom: 24 }}>
+          <div className="card-header"><span>Local Network Address</span></div>
+          <div className="card-body">
+            {networkInterfaces.length === 0 ? (
+              <div className="empty-state"><div className="empty-state-text">No local network information available.</div></div>
+            ) : (
+              <div style={{ display: "grid", gap: 10 }}>
+                {networkInterfaces.map((iface) => (
+                  <div key={`${iface.interface}-${iface.address}`} style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: 12, borderRadius: 8, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                    <div style={{ color: "var(--text2)", fontSize: 12 }}>{iface.interface}</div>
+                    <div style={{ color: "var(--text)", fontFamily: "var(--mono)", fontSize: 13 }}>{iface.address}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-2" style={{ marginBottom: 24 }}>

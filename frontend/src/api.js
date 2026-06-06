@@ -1,4 +1,8 @@
-const BASE = "http://10.150.253.172:5000/api";
+const host = window.location.hostname || "localhost";
+const port = 5000;
+const protocol = window.location.protocol === "https:" ? "https" : "http";
+const BASE = `${protocol}://${host}:${port}/api`;
+
 async function request(path, opts = {}) {
   const res = await fetch(`${BASE}${path}`, {
     headers: { "Content-Type": "application/json", ...opts.headers },
@@ -33,4 +37,5 @@ export const api = {
   createAlert: (body) => request("/alerts", { method: "POST", body: JSON.stringify(body) }),
   acknowledgeAlert: (id) => request(`/alerts/${id}/acknowledge`, { method: "PATCH" }),
   getSummary: () => request("/alerts/summary"),
+  getNetwork: () => request("/network"),
 };
