@@ -49,11 +49,38 @@ export default function Dashboard({ navigate }) {
     return unsub;
   }, [loadData, subscribe]);
 
-  // Build chart data from stats for one interesting metric
-  const tempStats = stats.find((s) => s.metric === "temperature");
-  const chartData = [
-    { t: "Min", v: tempStats?.min_val }, { t: "Avg", v: tempStats?.avg_val }, { t: "Max", v: tempStats?.max_val }
-  ].filter((d) => d.v != null);
+  const metricRanges = {
+    temperature: { min: 0, max: 50, label: "°C" },
+    humidity: { min: 0, max: 100, label: "%" },
+    co2: { min: 300, max: 2000, label: "ppm" },
+    pressure: { min: 900, max: 1100, label: "hPa" },
+    motion: { min: 0, max: 20, label: "events" },
+    power: { min: 0, max: 2500, label: "W" },
+  };
+
+  const metrics = Object.values(stats.reduce((acc, row) => {
+    const existing = acc[row.metric] || {
+      metric: row.metric,
+      unit: row.unit,
+      sumLatest: 0,
+      sumAvg: 0,
+      min_val: Infinity,
+      max_val: -Infinity,
+      count: 0,
+    };
+    existing.unit = row.unit || existing.unit;
+    existing.sumLatest += Number(row.latest_val || 0);
+    existing.sumAvg += Number(row.avg_val || 0);
+    existing.min_val = Math.min(existing.min_val, Number(row.min_val || Infinity));
+    existing.max_val = Math.max(existing.max_val, Number(row.max_val || -Infinity));
+    existing.count += 1;
+    acc[row.metric] = existing;
+    return acc;
+  }, {})).map((entry) => ({
+    ...entry,
+    latest_val: entry.count ? +(entry.sumLatest / entry.count).toFixed(1) : null,
+    avg_val: entry.count ? +(entry.sumAvg / entry.count).toFixed(1) : null,
+  }));
 
   return (
     <div>
@@ -74,10 +101,11 @@ export default function Dashboard({ navigate }) {
 
       <div className="page-content">
         {/* Stats */}
-        <div className="grid grid-4" style={{ marginBottom: 24 }}>
+        <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", marginBottom: 24 }}>
           <StatCard label="Total Devices" value={summary?.total_devices ?? "—"} desc="Registered endpoints" color="accent" />
           <StatCard label="Online" value={summary?.online ?? "—"} desc="Actively reporting" color="green" />
           <StatCard label="Warnings" value={(summary?.warning ?? 0) + (summary?.critical ?? 0)} desc="Need attention" color="yellow" />
+          <StatCard label="Alerts" value={summary?.unacked_alerts ?? 0} desc="Unacknowledged" color="red" />
           <StatCard label="Readings / 24h" value={summary?.readings_24h ?? "—"} desc="Data points ingested" color="accent" />
         </div>
 
@@ -115,36 +143,80 @@ export default function Dashboard({ navigate }) {
             </div>
           </div>
 
-          {/* Temperature chart */}
           <div className="card">
-            <div className="card-header"><span>Temperature Stats (24h)</span></div>
-            <div className="card-body">
-              {tempStats ? (
-                <>
-                  <div style={{ display: "flex", gap: 24, marginBottom: 16 }}>
-                    <Metric label="Latest" value={`${tempStats.latest_val}°C`} color="var(--accent)" />
-                    <Metric label="Avg" value={`${tempStats.avg_val}°C`} color="var(--text)" />
-                    <Metric label="Peak" value={`${tempStats.max_val}°C`} color="var(--red)" />
+            <div className="card-header"><span>Sensor Rate Scales</span></div>
+            <div className="card-body" style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 16 }}>
+              {metrics.length === 0 ? (
+                <div className="empty-state"><div className="empty-state-text">No sensor metrics available.</div></div>
+              ) : metrics.map((metric) => {
+                const range = metricRanges[metric.metric] || { min: 0, max: Math.max(metric.max_val || 100, 100), label: metric.unit || "" };
+                const latest = metric.latest_val ?? 0;
+                const ratio = Math.max(0, Math.min(1, (latest - range.min) / (range.max - range.min || 1)));
+                return (
+                  <div key={metric.metric} className="metric-scale-card">
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                      <div>
+                        <div className="stat-label">{metric.metric.toUpperCase()}</div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: "var(--text)", marginTop: 4 }}>{latest}{range.label}</div>
+                      </div>
+                      <div style={{ fontSize: 11, color: "var(--text3)", textTransform: "uppercase" }}>Avg {metric.avg_val}{range.label}</div>
+                    </div>
+                    <div className="scale-track">
+                      <div className="scale-bar" style={{ width: `${ratio * 100}%`, background: metric.metric === "temperature" ? "var(--red)" : metric.metric === "humidity" ? "var(--accent)" : metric.metric === "co2" ? "var(--yellow)" : metric.metric === "pressure" ? "var(--purple)" : metric.metric === "motion" ? "var(--green)" : "var(--accent)" }} />
+                    </div>
+                    <div className="scale-labels">
+                      <span>{range.min}</span><span>{range.max}</span>
+                    </div>
                   </div>
-                  <ResponsiveContainer width="100%" height={140}>
-                    <AreaChart data={chartData}>
-                      <defs>
-                        <linearGradient id="tg" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#ff3d5a" stopOpacity={0.3} />
-                          <stop offset="95%" stopColor="#ff3d5a" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <XAxis dataKey="t" />
-                      <YAxis domain={["auto", "auto"]} />
-                      <Tooltip />
-                      <Area type="monotone" dataKey="v" stroke="#ff3d5a" fill="url(#tg)" strokeWidth={2} name="°C" />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </>
-              ) : (
-                <div className="empty-state"><div className="empty-state-text">No temperature data yet</div></div>
-              )}
+                );
+              })}
             </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 16, overflowX: "auto", paddingBottom: 8, marginBottom: 24 }}>
+            {metrics.length === 0 ? (
+              <div className="card" style={{ minWidth: 280, flex: "0 0 280px" }}>
+                <div className="card-body"><div className="empty-state"><div className="empty-state-text">No sensor stats available.</div></div></div>
+              </div>
+            ) : metrics.map((metric) => {
+              const range = metricRanges[metric.metric] || { min: 0, max: Math.max(metric.max_val || 100, 100), label: metric.unit || "" };
+              const color = metric.metric === "temperature" ? "var(--red)" : metric.metric === "humidity" ? "var(--accent)" : metric.metric === "co2" ? "var(--yellow)" : metric.metric === "pressure" ? "var(--purple)" : metric.metric === "motion" ? "var(--green)" : "var(--accent)";
+              const data = [
+                { t: "Min", v: metric.min_val },
+                { t: "Avg", v: metric.avg_val },
+                { t: "Max", v: metric.max_val }
+              ].filter((item) => item.v != null);
+              return (
+                <div key={metric.metric} className="card" style={{ minWidth: 280, flex: "0 0 280px" }}>
+                  <div className="card-header"><span>{metric.metric.toUpperCase()} Stats</span></div>
+                  <div className="card-body" style={{ minHeight: 220 }}>
+                    <div style={{ display: "flex", gap: 24, marginBottom: 16 }}>
+                      <Metric label="Latest" value={`${metric.latest_val}${range.label}`} color={color} />
+                      <Metric label="Avg" value={`${metric.avg_val}${range.label}`} color="var(--text)" />
+                      <Metric label="Peak" value={`${metric.max_val}${range.label}`} color={color} />
+                    </div>
+                    {data.length > 0 ? (
+                      <ResponsiveContainer width="100%" height={120}>
+                        <AreaChart data={data}>
+                          <defs>
+                            <linearGradient id={`grad-${metric.metric}`} x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor={color} stopOpacity={0.35} />
+                              <stop offset="95%" stopColor={color} stopOpacity={0} />
+                            </linearGradient>
+                          </defs>
+                          <XAxis dataKey="t" tick={{ fill: "var(--text3)", fontSize: 11 }} />
+                          <YAxis domain={["auto", "auto"]} tick={{ fill: "var(--text3)", fontSize: 11 }} />
+                          <Tooltip />
+                          <Area type="monotone" dataKey="v" stroke={color} fill={`url(#grad-${metric.metric})`} strokeWidth={2} name={metric.metric} />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="empty-state"><div className="empty-state-text">No data for {metric.metric}</div></div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 
@@ -185,7 +257,7 @@ export default function Dashboard({ navigate }) {
         {/* Alerts */}
         <div className="card">
           <div className="card-header">
-            <span>Active Alerts</span>
+            <span>Alerts</span>
             <button className="btn btn-ghost btn-sm" onClick={() => navigate("alerts")}>View all →</button>
           </div>
           {alerts.length === 0 ? (

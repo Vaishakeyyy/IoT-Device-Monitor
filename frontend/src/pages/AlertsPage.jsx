@@ -41,9 +41,16 @@ export default function AlertsPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const acknowledge = async (id) => {
+  const acknowledge = async (alert) => {
+    setError(null);
+
+    if (alert.synthetic) {
+      setAlerts((prev) => prev.map((a) => (a.id === alert.id ? { ...a, acknowledged: true } : a)));
+      return;
+    }
+
     try {
-      await api.acknowledgeAlert(id);
+      await api.acknowledgeAlert(alert.id);
       await load();
     } catch (e) {
       console.error(e);
@@ -52,10 +59,19 @@ export default function AlertsPage() {
   };
 
   const ackAll = async () => {
+    setError(null);
+    const unacked = alerts.filter((a) => !a.acknowledged);
+    const synthetic = unacked.filter((a) => a.synthetic);
+    const real = unacked.filter((a) => !a.synthetic);
+
     try {
-      const unacked = alerts.filter((a) => !a.acknowledged);
-      await Promise.all(unacked.map((a) => api.acknowledgeAlert(a.id)));
-      await load();
+      if (real.length) {
+        await Promise.all(real.map((a) => api.acknowledgeAlert(a.id)));
+      }
+      if (synthetic.length) {
+        setAlerts((prev) => prev.map((a) => (a.synthetic && !a.acknowledged ? { ...a, acknowledged: true } : a)));
+      }
+      if (real.length) await load();
     } catch (e) {
       console.error(e);
       setError("Failed to acknowledge all alerts. Please retry.");
@@ -81,7 +97,7 @@ export default function AlertsPage() {
           <div className="page-sub">{alerts.length} alerts</div>
         </div>
         <div className="page-actions">
-          {filter === "unacked" && alerts.length > 0 && (
+          {filter === "unacked" && alerts.some((a) => !a.acknowledged && !a.synthetic) && (
             <button className="btn btn-ghost btn-sm" onClick={ackAll}>✓ Acknowledge All</button>
           )}
         </div>
@@ -135,7 +151,7 @@ export default function AlertsPage() {
                     <td className="mono">{new Date(a.created_at).toLocaleString()}</td>
                     <td>
                       {!a.acknowledged ? (
-                        <button className="btn btn-ghost btn-sm" onClick={() => acknowledge(a.id)}>✓ ACK</button>
+                        <button className="btn btn-ghost btn-sm" onClick={() => acknowledge(a)}>✓ ACK</button>
                       ) : (
                         <span style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--green)" }}>ACKNOWLEDGED</span>
                       )}
