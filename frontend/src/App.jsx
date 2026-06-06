@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
 import { WsProvider } from "./context/WsContext";
+import { AuthProvider, useAuth } from "./context/AuthContext";
 import Dashboard from "./pages/Dashboard";
 import DevicesPage from "./pages/DevicesPage";
 import AlertsPage from "./pages/AlertsPage";
 import DeviceDetail from "./pages/DeviceDetail";
+import Admin from "./pages/Admin";
+import UserPage from "./pages/UserPage";
 import "./App.css";
 
 const getInitialTheme = () => {
@@ -38,26 +41,33 @@ export default function App() {
   const navigate = (p, data) => { setPage(p); if (data) setSelectedDevice(data); };
 
   return (
-    <WsProvider>
-      <div className="app">
-        <Sidebar page={page} navigate={navigate} theme={theme} setTheme={setTheme} online={online} />
-        <main className="main-content">
-          {page === "dashboard" && <Dashboard navigate={navigate} />}
-          {page === "devices" && <DevicesPage navigate={navigate} />}
-          {page === "device-detail" && <DeviceDetail device={selectedDevice} navigate={navigate} />}
-          {page === "alerts" && <AlertsPage />}
-        </main>
-      </div>
-    </WsProvider>
+    <AuthProvider>
+      <WsProvider>
+        <div className="app">
+          <Sidebar page={page} navigate={navigate} theme={theme} setTheme={setTheme} online={online} />
+          <main className="main-content">
+            {page === "dashboard" && <Dashboard navigate={navigate} />}
+            {page === "devices" && <DevicesPage navigate={navigate} />}
+            {page === "device-detail" && <DeviceDetail device={selectedDevice} navigate={navigate} />}
+            {page === "alerts" && <AlertsPage />}
+            {page === "admin" && <Admin navigate={navigate} />}
+            {page === "user" && <UserPage navigate={navigate} />}
+          </main>
+        </div>
+      </WsProvider>
+    </AuthProvider>
   );
 }
 
 function Sidebar({ page, navigate, theme, setTheme, online }) {
+  const { user, loginAs, logout } = useAuth();
   const nav = [
     { id: "dashboard", icon: "⬡", label: "Dashboard" },
     { id: "devices", icon: "◈", label: "Devices" },
     { id: "alerts", icon: "△", label: "Alerts" },
   ];
+  if (user?.role === "admin") nav.push({ id: "admin", icon: "⚙️", label: "Admin" });
+  nav.push({ id: "user", icon: "🙂", label: "My Devices" });
 
   return (
     <aside className="sidebar">
@@ -83,6 +93,14 @@ function Sidebar({ page, navigate, theme, setTheme, online }) {
             {online ? "Wi-Fi Ready" : "Offline"}
           </div>
           <ThemeToggle theme={theme} setTheme={setTheme} />
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8 }}>
+          <div style={{ fontSize: 12, color: "var(--text3)", fontFamily: "var(--mono)" }}>{user?.username} · {user?.role}</div>
+          {user?.role !== "admin" ? (
+            <button className="btn btn-ghost btn-sm" onClick={() => loginAs("admin")}>Switch to Admin</button>
+          ) : (
+            <button className="btn btn-ghost btn-sm" onClick={() => loginAs("user")}>Switch to User</button>
+          )}
         </div>
         <div className="version-tag">v1.0.0 • NEXUS</div>
       </div>
