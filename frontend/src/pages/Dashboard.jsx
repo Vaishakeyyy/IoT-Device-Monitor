@@ -28,7 +28,7 @@ export default function Dashboard({ navigate }) {
     const unsub = subscribe((msg) => {
       if (msg.type === "reading") {
         setLiveFeed((prev) => [
-          { ...msg, id: Date.now(), time: new Date().toLocaleTimeString() },
+          { ...msg, id: `${Date.now()}-${Math.random()}`, time: new Date().toLocaleTimeString() },
           ...prev.slice(0, 19),
         ]);
         setSummary((s) => s ? { ...s, readings_24h: (s.readings_24h || 0) + 1 } : s);

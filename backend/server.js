@@ -10,7 +10,7 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ server, path: "/ws" });
 
 // Middleware
-app.use(cors({ origin: process.env.FRONTEND_URL || "http://localhost:3000" }));
+app.use(cors());
 app.use(express.json());
 
 // WebSocket broadcast helper
@@ -68,7 +68,9 @@ const PORT = process.env.PORT || 5000;
 initDB()
   .then(() => {
     simulateSensorData();
-    server.listen(PORT, () => console.log(`🚀 IoT Monitor backend running on http://localhost:${PORT}`));
+    server.listen(PORT, "0.0.0.0", () =>
+  console.log(`🚀 IoT Monitor backend running on http://0.0.0.0:${PORT}`)
+);
   })
   .catch((err) => {
     console.error("❌ Failed to initialize DB:", err.message);

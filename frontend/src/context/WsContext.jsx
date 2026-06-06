@@ -9,7 +9,7 @@ export function WsProvider({ children }) {
   const listeners = useRef([]);
 
   const connect = useCallback(() => {
-    const url = (process.env.REACT_APP_WS_URL || "ws://localhost:5000") + "/ws";
+    const url = "ws://10.150.253.172:5000/ws";
     const socket = new WebSocket(url);
     ws.current = socket;
 
