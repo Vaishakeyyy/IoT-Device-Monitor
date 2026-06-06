@@ -5,34 +5,72 @@ export default function AlertsPage() {
   const [alerts, setAlerts] = useState([]);
   const [filter, setFilter] = useState("unacked");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const params = filter === "unacked" ? { acknowledged: false } : filter === "acked" ? { acknowledged: true } : {};
-      const r = await api.getAlerts(params);
-      setAlerts(r.data);
-    } catch (e) { console.error(e); }
-    finally { setLoading(false); }
+      const [alertResp, deviceResp] = await Promise.all([api.getAlerts(params), api.getDevices()]);
+      const actualAlerts = alertResp.data || [];
+      const deviceAlerts = deviceResp.data
+        .filter((d) => d.status && d.status !== "online")
+        .map((d) => ({
+          id: `device-status-${d.device_id}`,
+          device_id: d.device_id,
+          device_name: d.name,
+          location: d.location,
+          severity: d.status,
+          message: `Device status is ${d.status}`,
+          acknowledged: false,
+          created_at: d.last_seen || new Date().toISOString(),
+          synthetic: true,
+        }));
+
+      const combined = filter === "acked" ? actualAlerts : [...deviceAlerts, ...actualAlerts];
+      setAlerts(combined);
+    } catch (e) {
+      console.error(e);
+      setAlerts([]);
+      setError("Unable to load alerts. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   }, [filter]);
 
   useEffect(() => { load(); }, [load]);
 
   const acknowledge = async (id) => {
-    await api.acknowledgeAlert(id);
-    load();
+    try {
+      await api.acknowledgeAlert(id);
+      await load();
+    } catch (e) {
+      console.error(e);
+      setError("Failed to acknowledge alert. Please retry.");
+    }
   };
 
   const ackAll = async () => {
-    const unacked = alerts.filter((a) => !a.acknowledged);
-    await Promise.all(unacked.map((a) => api.acknowledgeAlert(a.id)));
-    load();
+    try {
+      const unacked = alerts.filter((a) => !a.acknowledged);
+      await Promise.all(unacked.map((a) => api.acknowledgeAlert(a.id)));
+      await load();
+    } catch (e) {
+      console.error(e);
+      setError("Failed to acknowledge all alerts. Please retry.");
+    }
   };
 
-  const severityOrder = { critical: 0, warning: 1, info: 2 };
-  const sorted = [...alerts].sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
+  const severityOrder = { critical: 0, warning: 1, info: 2, offline: 3 };
+  const sorted = [...alerts].sort((a, b) => (severityOrder[a.severity] ?? 99) - (severityOrder[b.severity] ?? 99));
 
-  const counts = { critical: alerts.filter((a) => a.severity === "critical").length, warning: alerts.filter((a) => a.severity === "warning").length, info: alerts.filter((a) => a.severity === "info").length };
+  const counts = {
+    critical: alerts.filter((a) => a.severity === "critical").length,
+    warning: alerts.filter((a) => a.severity === "warning").length,
+    info: alerts.filter((a) => a.severity === "info").length,
+    offline: alerts.filter((a) => a.severity === "offline").length,
+  };
 
   return (
     <div>
@@ -51,8 +89,8 @@ export default function AlertsPage() {
 
       <div className="page-content">
         {/* Stats */}
-        <div className="grid grid-3" style={{ marginBottom: 24 }}>
-          {[["CRITICAL", counts.critical, "red"], ["WARNING", counts.warning, "yellow"], ["INFO", counts.info, "accent"]].map(([l, v, c]) => (
+        <div className="grid grid-4" style={{ marginBottom: 24 }}>
+          {[ ["CRITICAL", counts.critical, "red"], ["WARNING", counts.warning, "yellow"], ["INFO", counts.info, "accent"], ["OFFLINE", counts.offline, "offline"] ].map(([l, v, c]) => (
             <div key={l} className={`stat-card ${c}`}>
               <div className="stat-label">{l}</div>
               <div className={`stat-value ${c}`}>{v}</div>
@@ -70,6 +108,8 @@ export default function AlertsPage() {
         <div className="card">
           {loading ? (
             <div style={{ padding: 32, textAlign: "center", color: "var(--text3)", fontFamily: "var(--mono)", fontSize: 12 }}>Loading...</div>
+          ) : error ? (
+            <div style={{ padding: 32, textAlign: "center", color: "var(--red)", fontFamily: "var(--mono)", fontSize: 12 }}>{error}</div>
           ) : sorted.length === 0 ? (
             <div className="empty-state">
               <div className="empty-state-icon">✓</div>

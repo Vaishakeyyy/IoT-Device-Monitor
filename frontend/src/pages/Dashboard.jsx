@@ -14,15 +14,24 @@ export default function Dashboard({ navigate }) {
 
   const loadData = useCallback(async () => {
     try {
-      const [s, d, a, st, net] = await Promise.all([
-        api.getSummary(), api.getDevices(), api.getAlerts({ acknowledged: false }), api.getStats(), api.getNetwork()
+      const [s, d, a, st] = await Promise.all([
+        api.getSummary(), api.getDevices(), api.getAlerts({ acknowledged: false }), api.getStats()
       ]);
       setSummary(s.data);
       setDevices(d.data.slice(0, 6));
       setAlerts(a.data.slice(0, 5));
       setStats(st.data);
+    } catch (e) {
+      console.error(e);
+    }
+
+    try {
+      const net = await api.getNetwork();
       setNetworkInterfaces(net.interfaces ?? []);
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.warn("Network info unavailable", e);
+      setNetworkInterfaces([]);
+    }
   }, []);
 
   useEffect(() => {

@@ -4,14 +4,38 @@ const { pool } = require("../database");
 
 // GET all alerts
 router.get("/", async (req, res) => {
-  const { acknowledged } = req.query;
+  const acknowledgedParam = req.query.acknowledged;
   try {
-    let query = `SELECT a.*, d.name as device_name, d.location FROM alerts a
-                 JOIN devices d ON a.device_id = d.device_id`;
-    if (acknowledged !== undefined) query += ` WHERE a.acknowledged = ${acknowledged === "true" ? 1 : 0}`;
-    query += ` ORDER BY a.created_at DESC LIMIT 100`;
-    const [rows] = await pool.query(query);
-    res.json({ success: true, data: rows });
+    const ackFilter = acknowledgedParam !== undefined ? (acknowledgedParam === "true" || acknowledgedParam === "1") : null;
+
+    // Existing alerts from the alerts table
+    let alertQuery = `SELECT a.*, d.name as device_name, d.location FROM alerts a
+                      JOIN devices d ON a.device_id = d.device_id`;
+    if (ackFilter !== null) {
+      alertQuery += ` WHERE a.acknowledged = ${ackFilter ? 1 : 0}`;
+    }
+    alertQuery += ` ORDER BY a.created_at DESC LIMIT 100`;
+    const [alertRows] = await pool.query(alertQuery);
+
+    // Synthetic alerts from devices with non-normal statuses
+    const deviceAlertRows = ackFilter !== true ? (await pool.query(
+      `SELECT
+         NULL as id,
+         d.device_id,
+         d.status as severity,
+         CONCAT('Device status is ', d.status) as message,
+         FALSE as acknowledged,
+         d.name as device_name,
+         d.location,
+         d.last_seen as created_at
+       FROM devices d
+       WHERE d.status IN ('warning','critical','offline')
+       ORDER BY d.last_seen DESC
+       LIMIT 100`
+    ))[0] : [];
+
+    const combined = ackFilter === true ? alertRows : [...deviceAlertRows, ...alertRows];
+    res.json({ success: true, data: combined });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
