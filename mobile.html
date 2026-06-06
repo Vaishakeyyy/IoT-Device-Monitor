@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+<body>
+<button onclick="sendData()">Send Sensor Data</button>
+
+<script>
+function sendData() {
+  fetch("http://10.150.253.172:5000/api/readings", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      device_id: "MOBILE-001",
+      metric: "temperature",
+      value: 28.5,
+      unit: "°C"
+    })
+  })
+  .then(r => r.json())
+  .then(console.log)
+  .catch(console.error);
+}
+</script>
+</body>
+</html>

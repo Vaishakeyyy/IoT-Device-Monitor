@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>IoT Mobile Test</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body style="font-family: Arial; text-align: center; padding: 30px;">
+
+    <h2>📱 IoT Device Simulator</h2>
+
+    <button onclick="sendTemperature()">
+        Send Temperature Reading
+    </button>
+
+    <br><br>
+
+    <button onclick="sendHumidity()">
+        Send Humidity Reading
+    </button>
+
+    <br><br>
+
+    <div id="result"></div>
+
+    <script>
+        const SERVER = "http://10.150.253.172:5000";
+
+        async function sendTemperature() {
+            sendData(
+                "DEV-001",
+                "temperature",
+                (20 + Math.random() * 10).toFixed(2),
+                "°C"
+            );
+        }
+
+        async function sendHumidity() {
+            sendData(
+                "DEV-002",
+                "humidity",
+                (40 + Math.random() * 30).toFixed(2),
+                "%"
+            );
+        }
+
+        async function sendData(device_id, metric, value, unit) {
+
+            document.getElementById("result").innerHTML =
+                "Sending data...";
+
+            try {
+
+                const response = await fetch(
+                    SERVER + "/api/readings",
+                    {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify({
+                            device_id,
+                            metric,
+                            value: Number(value),
+                            unit
+                        })
+                    }
+                );
+
+                const data = await response.json();
+
+                document.getElementById("result").innerHTML =
+                    "<pre>" +
+                    JSON.stringify(data, null, 2) +
+                    "</pre>";
+
+            } catch (err) {
+
+                document.getElementById("result").innerHTML =
+                    "<h3 style='color:red'>ERROR</h3>" +
+                    err.message;
+
+                console.error(err);
+            }
+        }
+    </script>
+
+</body>
+</html>

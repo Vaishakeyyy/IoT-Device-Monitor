@@ -37,6 +37,48 @@ app.use("/api/alerts", require("./routes/alerts"));
 // Health check
 app.get("/api/health", (req, res) => res.json({ status: "ok", timestamp: new Date() }));
 
+app.get("/api/test", (req, res) => {
+  res.json({
+    success: true,
+    message: "Hello from IoT backend"
+  });
+});
+
+app.get("/mobile-test", (req, res) => {
+  res.send(`
+    <html>
+    <body>
+      <h2>IoT Mobile Test</h2>
+      <button onclick="send()">Send Reading</button>
+
+      <script>
+      async function send() {
+        try {
+          const res = await fetch('/api/readings', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              device_id: 'DEV-001',
+              metric: 'temperature',
+              value: 30,
+              unit: '°C'
+            })
+          });
+
+          const data = await res.json();
+          alert(JSON.stringify(data));
+        } catch(err) {
+          alert(err.message);
+        }
+      }
+      </script>
+    </body>
+    </html>
+  `);
+});
+
 // Simulate live sensor data (demo mode)
 function simulateSensorData() {
   const { pool } = require("./database");
