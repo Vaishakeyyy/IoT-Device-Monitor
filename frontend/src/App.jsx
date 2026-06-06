@@ -80,12 +80,12 @@ function AppShell() {
 function Sidebar({ page, navigate, theme, setTheme, online }) {
   const { user, loginAs, logout } = useAuth();
   const nav = [
-    { id: "dashboard", icon: "⬡", label: "Dashboard" },
-    { id: "devices", icon: "◈", label: "Devices" },
-    { id: "alerts", icon: "△", label: "Alerts" },
+    { id: "dashboard", icon: "⬢", label: "Dashboard" },
+    { id: "devices", icon: "⬡", label: "Devices" },
+    { id: "alerts", icon: "⚠", label: "Alerts" },
   ];
-  if (user?.role === "admin") nav.push({ id: "admin", icon: "⚙️", label: "Admin" });
-  nav.push({ id: "user", icon: "🙂", label: "My Devices" });
+  if (user?.role === "admin") nav.push({ id: "admin", icon: "❖ ", label: "Admin" });
+  nav.push({ id: "user", icon: "🖧", label: "My Devices" });
 
   return (
     <aside className="sidebar">

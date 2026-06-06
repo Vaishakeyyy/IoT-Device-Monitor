@@ -32,7 +32,7 @@ export default function Admin({ navigate }) {
       <div>
         <div className="page-header">
           <div>
-            <div className="breadcrumb"><span>NEXUS</span><span>/</span><span>Admin</span></div>
+            <div className="breadcrumb"><span>IoT</span><span>/</span><span>Admin</span></div>
             <div className="page-title">Administration</div>
             <div className="page-sub">Access denied</div>
           </div>
@@ -88,7 +88,7 @@ export default function Admin({ navigate }) {
     <div>
       <div className="page-header">
         <div>
-          <div className="breadcrumb"><span>NEXUS</span><span>/</span><span>Admin</span></div>
+          <div className="breadcrumb"><span>IoT</span><span>/</span><span>Admin</span></div>
           <div className="page-title">Administration</div>
           <div className="page-sub">Manage devices, users and system state</div>
         </div>

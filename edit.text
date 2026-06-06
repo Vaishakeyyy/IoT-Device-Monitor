@@ -1,0 +1,36 @@
+How to edit each component in the web:
+
+1. Main app shell
+- frontend/src/App.jsx
+- Controls page routing, sidebar, theme toggle, and which page component renders.
+- Edit this to change navigation, add new top-level pages, or adjust the sidebar layout.
+
+2. Page components
+Each page is a separate component under frontend/src/pages/
+- frontend/src/pages/Dashboard.jsx: Main overview screen. Edit stats cards, charts, live feed, recent devices, alerts.
+- frontend/src/pages/DevicesPage.jsx: Device list and actions. Edit the table, filters, device buttons.
+- frontend/src/pages/DeviceDetail.jsx: Single device detail view. Edit detail layout and device information display.
+- frontend/src/pages/AlertsPage.jsx: Alerts list screen. Edit alert rows / alert filters.
+- frontend/src/pages/Admin.jsx: Admin panel. Edit user management, assignment UI, device admin actions.
+- frontend/src/pages/UserPage.jsx: User-specific page. Edit personal device view and user info.
+- frontend/src/pages/Login.jsx: Login form. Edit fields, buttons, sample credentials display.
+
+3. Shared state and helpers
+- frontend/src/context/AuthContext.jsx: Login/logout logic and sample user seeding. Edit auth behavior, stored users, and access control.
+- frontend/src/context/WsContext.jsx: WebSocket/live updates. Edit connection/subscription logic.
+- frontend/src/api.js: Backend API calls. Edit endpoints, request handling, or add new data fetches.
+
+4. Styling
+- frontend/src/App.css: Global styles used by all pages. Edit colors, layout classes, spacing, cards, buttons.
+- frontend/public/index.html: Root HTML wrapper if you need to change title/meta or add global scripts.
+
+5. Practical editing flow
+1. Open the file for the page/component you want to change.
+2. Update the JSX structure or logic inside that component.
+3. Save and refresh the browser (`npm run dev` in `frontend` if running).
+4. If you change data shape, also update `api.js` or context files as needed.
+
+6. Example
+- To change the dashboard title: edit frontend/src/pages/Dashboard.jsx
+- To change login button text: edit frontend/src/pages/Login.jsx
+- To change user state or sample login accounts: edit frontend/src/context/AuthContext.jsx
