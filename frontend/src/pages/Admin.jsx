@@ -3,8 +3,17 @@ import { api } from "../api";
 import { useAuth } from "../context/AuthContext";
 
 function loadUsers() {
-  try { return JSON.parse(localStorage.getItem("iot-users")) || [{ username: "alice", role: "user" }, { username: "bob", role: "user" }]; }
-  catch (e) { return [{ username: "alice", role: "user" }, { username: "bob", role: "user" }]; }
+  try {
+    return JSON.parse(localStorage.getItem("iot-users")) || [
+      { username: "admin", password: "adminpass", role: "admin" },
+      { username: "alice", password: "alicepass", role: "user" }
+    ];
+  } catch (e) {
+    return [
+      { username: "admin", password: "adminpass", role: "admin" },
+      { username: "alice", password: "alicepass", role: "user" }
+    ];
+  }
 }
 
 function saveUsers(list) { localStorage.setItem("iot-users", JSON.stringify(list)); }
@@ -57,14 +66,22 @@ export default function Admin({ navigate }) {
     setAssignments(next); saveAssignments(next);
   };
 
-  const delDevice = async (id) => {
+  const delDevice = async (deviceId) => {
     if (!confirm("Delete this device?")) return;
-    try { await api.deleteDevice(id); await load(); } catch (e) { console.error(e); alert("Failed to delete device"); }
+    try { await api.deleteDevice(deviceId); await load(); } catch (e) { console.error(e); alert("Failed to delete device"); }
   };
 
-  const editDevice = async (id) => {
+  const editDevice = async (deviceId) => {
     const name = prompt("New name"); if (name == null) return;
-    try { await api.updateDevice(id, { name }); await load(); } catch (e) { console.error(e); alert("Failed to update"); }
+    try { await api.updateDevice(deviceId, { name }); await load(); } catch (e) { console.error(e); alert("Failed to update"); }
+  };
+
+  const toggleDevice = async (deviceId, currentStatus) => {
+    const nextStatus = currentStatus === 'online' ? 'offline' : 'online';
+    try {
+      await api.updateDevice(deviceId, { status: nextStatus });
+      await load();
+    } catch (e) { console.error(e); alert('Failed to toggle device status'); }
   };
 
   return (
@@ -95,13 +112,22 @@ export default function Admin({ navigate }) {
               <div key={u.username} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0" }}>
                 <div><strong>{u.username}</strong> <span style={{ color: "var(--text3)", fontFamily: "var(--mono)" }}>{u.role}</span></div>
                 <div>
-                  <button className="btn btn-ghost btn-sm" onClick={() => { const name = prompt("Username", u.username); if (name) { const next = users.map(x => x.username===u.username ? { ...x, username: name } : x); setUsers(next); saveUsers(next); }}}>Edit</button>
+                  <button className="btn btn-ghost btn-sm" onClick={() => {
+                    const name = prompt("Username", u.username); if (!name) return;
+                    const pass = prompt("Password (leave blank to keep)");
+                    const next = users.map(x => x.username===u.username ? { ...x, username: name, password: pass ? pass : x.password } : x);
+                    setUsers(next); saveUsers(next);
+                  }}>Edit</button>
                   <button className="btn btn-ghost btn-sm" onClick={() => { if (!confirm('Delete user?')) return; const next = users.filter(x => x.username !== u.username); setUsers(next); saveUsers(next); }}>Delete</button>
                 </div>
               </div>
             ))}
             <div style={{ marginTop: 12 }}>
-              <button className="btn btn-primary btn-sm" onClick={() => { const name = prompt('New username'); if (!name) return; const next = [...users, { username: name, role: 'user' }]; setUsers(next); saveUsers(next); }}>+ Add User</button>
+              <button className="btn btn-primary btn-sm" onClick={() => {
+                const name = prompt('New username'); if (!name) return;
+                const pass = prompt('Password for user'); if (pass == null) return;
+                const next = [...users, { username: name, role: 'user', password: pass }]; setUsers(next); saveUsers(next);
+              }}>+ Add User</button>
             </div>
           </div>
         </div>
@@ -128,8 +154,9 @@ export default function Admin({ navigate }) {
                           <option value="">Unassigned</option>
                           {users.map((u) => <option key={u.username} value={u.username}>{u.username}</option>)}
                         </select>
-                        <button className="btn btn-ghost btn-sm" onClick={() => editDevice(d.id)}>Edit</button>
-                        <button className="btn btn-ghost btn-sm" onClick={() => delDevice(d.id)}>Delete</button>
+                        <button className="btn btn-ghost btn-sm" onClick={() => editDevice(d.device_id)}>Edit</button>
+                        <button className="btn btn-ghost btn-sm" onClick={() => delDevice(d.device_id)}>Delete</button>
+                        <button className="btn btn-ghost btn-sm" onClick={() => toggleDevice(d.device_id, d.status)}>{d.status === 'online' ? 'Turn Off' : 'Turn On'}</button>
                       </td>
                     </tr>
                   ))}

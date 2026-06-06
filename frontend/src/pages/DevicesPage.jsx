@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { api } from "../api";
 import { DeviceIcon } from "./Dashboard";
+import { useAuth } from "../context/AuthContext";
 
 export default function DevicesPage({ navigate }) {
   const [devices, setDevices] = useState([]);
@@ -29,6 +30,11 @@ export default function DevicesPage({ navigate }) {
     if (!window.confirm("Remove this device?")) return;
     await api.deleteDevice(id);
     load();
+  };
+
+  const toggleDevice = async (deviceId, currentStatus) => {
+    const nextStatus = currentStatus === 'online' ? 'offline' : 'online';
+    try { await api.updateDevice(deviceId, { status: nextStatus }); await load(); } catch (e) { console.error(e); alert('Failed to toggle device status'); }
   };
 
   return (
@@ -72,8 +78,8 @@ export default function DevicesPage({ navigate }) {
         ) : (
           <div className="grid grid-3">
             {filtered.map((d) => (
-              <DeviceCard key={d.id} device={d} onView={() => navigate("device-detail", d)} onDelete={() => handleDelete(d.device_id)} />
-            ))}
+                <DeviceCard key={d.id} device={d} onView={() => navigate("device-detail", d)} onDelete={() => handleDelete(d.device_id)} onToggle={() => toggleDevice(d.device_id, d.status)} />
+              ))}
           </div>
         )}
       </div>
@@ -83,7 +89,8 @@ export default function DevicesPage({ navigate }) {
   );
 }
 
-function DeviceCard({ device: d, onView, onDelete }) {
+function DeviceCard({ device: d, onView, onDelete, onToggle }) {
+  const { user } = useAuth();
   return (
     <div className="card" style={{ cursor: "default" }}>
       <div style={{ padding: "16px 20px" }}>
@@ -100,7 +107,12 @@ function DeviceCard({ device: d, onView, onDelete }) {
       </div>
       <div style={{ padding: "10px 16px", borderTop: "1px solid var(--border)", display: "flex", gap: 8 }}>
         <button className="btn btn-ghost btn-sm" style={{ flex: 1 }} onClick={onView}>View →</button>
-        <button className="btn btn-danger btn-sm" onClick={onDelete}>✕</button>
+        {user?.role === 'admin' && (
+          <>
+            <button className="btn btn-ghost btn-sm" onClick={onToggle}>{d.status === 'online' ? 'Turn Off' : 'Turn On'}</button>
+            <button className="btn btn-danger btn-sm" onClick={onDelete}>✕</button>
+          </>
+        )}
       </div>
     </div>
   );
