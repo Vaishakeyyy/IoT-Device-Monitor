@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const { pool } = require("../database");
+const { evaluateReadingLimit } = require("../limitEvaluator");
 
 // POST ingest reading (device sends data here)
 router.post("/", async (req, res) => {
@@ -16,6 +17,13 @@ router.post("/", async (req, res) => {
       `UPDATE devices SET last_seen=NOW(), status='online' WHERE device_id=?`,
       [device_id]
     );
+    await evaluateReadingLimit({
+      device_id,
+      metric,
+      value,
+      unit,
+      broadcast: req.app.locals.broadcast,
+    });
     // Broadcast via WebSocket (attached to app)
     if (req.app.locals.broadcast) {
       req.app.locals.broadcast({ type: "reading", device_id, metric, value, unit, timestamp: new Date() });

@@ -133,7 +133,7 @@ export default function AlertsPage() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>Severity</th><th>Device</th><th>Location</th><th>Message</th><th>Time</th><th>Action</th>
+                  <th>Severity</th><th>Device</th><th>Sensor</th><th>Current</th><th>Limit</th><th>Message</th><th>Time</th><th>Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -144,7 +144,12 @@ export default function AlertsPage() {
                       <div style={{ fontWeight: 500, color: "var(--text)" }}>{a.device_name}</div>
                       <div style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--text3)" }}>{a.device_id}</div>
                     </td>
-                    <td style={{ color: "var(--text2)" }}>{a.location || "—"}</td>
+                    <td>
+                      <div style={{ color: "var(--text2)" }}>{a.sensor_name || a.location || "—"}</div>
+                      {a.location && a.sensor_name && <div style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--text3)" }}>{a.location}</div>}
+                    </td>
+                    <td className="mono">{a.current_value ?? "—"}</td>
+                    <td className="mono">{a.configured_limit ?? "—"}</td>
                     <td style={{ maxWidth: 300, color: "var(--text2)" }}>{a.message}</td>
                     <td className="mono">{new Date(a.created_at).toLocaleString()}</td>
                     <td>

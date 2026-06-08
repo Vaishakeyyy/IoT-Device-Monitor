@@ -78,7 +78,65 @@ router.get("/summary", async (req, res) => {
     const [[{ critical }]] = await pool.query(`SELECT COUNT(*) as critical FROM devices WHERE status='critical'`);
     const [[{ unacked }]] = await pool.query(`SELECT COUNT(*) as unacked FROM alerts WHERE acknowledged=FALSE`);
     const [[{ total_readings }]] = await pool.query(`SELECT COUNT(*) as total_readings FROM sensor_readings WHERE timestamp > DATE_SUB(NOW(), INTERVAL 24 HOUR)`);
-    res.json({ success: true, data: { total_devices, online, warning, critical, offline: total_devices - online - warning - critical, unacked_alerts: unacked, readings_24h: total_readings } });
+    const [[{ active_critical_alerts }]] = await pool.query(`SELECT COUNT(*) as active_critical_alerts FROM alerts WHERE acknowledged=FALSE AND severity='critical'`);
+    const [limitRows] = await pool.query(`
+      SELECT
+        dl.device_id,
+        dl.sensor_name,
+        dl.min_limit,
+        dl.max_limit,
+        dl.warning_threshold,
+        dl.critical_threshold,
+        sr.value
+      FROM device_limits dl
+      LEFT JOIN sensor_readings sr
+        ON sr.id = (
+          SELECT sr2.id FROM sensor_readings sr2
+          WHERE sr2.device_id = dl.device_id AND sr2.metric = dl.sensor_name
+          ORDER BY sr2.timestamp DESC
+          LIMIT 1
+        )
+    `);
+
+    const limitStateByDevice = limitRows.reduce((acc, row) => {
+      const value = Number(row.value);
+      if (!Number.isFinite(value)) {
+        acc[row.device_id] = acc[row.device_id] || "normal";
+        return acc;
+      }
+
+      const exceeded =
+        (row.max_limit != null && value > Number(row.max_limit)) ||
+        (row.min_limit != null && value < Number(row.min_limit)) ||
+        (row.critical_threshold != null && value >= Number(row.critical_threshold));
+      const near = row.warning_threshold != null && value >= Number(row.warning_threshold);
+
+      if (exceeded) acc[row.device_id] = "exceeded";
+      else if (near && acc[row.device_id] !== "exceeded") acc[row.device_id] = "near";
+      else acc[row.device_id] = acc[row.device_id] || "normal";
+      return acc;
+    }, {});
+
+    const devices_within_limits = Object.values(limitStateByDevice).filter((state) => state === "normal").length;
+    const devices_near_limit = Object.values(limitStateByDevice).filter((state) => state === "near").length;
+    const devices_exceeding_limits = Object.values(limitStateByDevice).filter((state) => state === "exceeded").length;
+
+    res.json({
+      success: true,
+      data: {
+        total_devices,
+        online,
+        warning,
+        critical,
+        offline: total_devices - online - warning - critical,
+        unacked_alerts: unacked,
+        readings_24h: total_readings,
+        devices_within_limits,
+        devices_near_limit,
+        devices_exceeding_limits,
+        active_critical_alerts,
+      },
+    });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

@@ -1,10 +1,10 @@
 import { useEffect, useState, useCallback } from "react";
 import { api } from "../api";
-import { useAuth } from "../context/AuthContext";
+import { normalizeUsers, useAuth } from "../context/AuthContext";
 
 function loadUsers() {
   try {
-    return JSON.parse(localStorage.getItem("iot-users")) || [
+    return normalizeUsers(JSON.parse(localStorage.getItem("iot-users"))) || [
       { username: "admin", password: "adminpass", role: "admin" },
       { username: "alice", password: "alicepass", role: "user" }
     ];
@@ -16,7 +16,16 @@ function loadUsers() {
   }
 }
 
-function saveUsers(list) { localStorage.setItem("iot-users", JSON.stringify(list)); }
+function saveUsers(list) {
+  const normalized = normalizeUsers(list);
+  localStorage.setItem("iot-users", JSON.stringify(normalized));
+  return normalized;
+}
+
+function userExists(users, username, exceptUsername) {
+  const clean = String(username || "").trim();
+  return users.some((user) => user.username === clean && user.username !== exceptUsername);
+}
 
 function loadAssignments() {
   try { return JSON.parse(localStorage.getItem("iot-assignments")) || {}; }
@@ -27,6 +36,15 @@ function saveAssignments(a) { localStorage.setItem("iot-assignments", JSON.strin
 
 export default function Admin({ navigate }) {
   const { user } = useAuth();
+  const [cmdLogs, setCmdLogs] = useState([]);
+  const [activeTab, setActiveTab] = useState("users");
+
+  useEffect(() => {
+    if (activeTab === "cmdlogs") {
+      api.getAllCommandLogs().then((r) => setCmdLogs(r.data)).catch(() => {});
+    }
+  }, [activeTab]);
+
   if (!user || user.role !== "admin") {
     return (
       <div>
@@ -37,7 +55,12 @@ export default function Admin({ navigate }) {
             <div className="page-sub">Access denied</div>
           </div>
         </div>
-        <div className="page-content">
+        <div style={{ padding: "0 32px", borderBottom: "1px solid var(--border)", display: "flex", gap: 0 }}>
+        {[["users","Users & Access"],["cmdlogs","Command Logs"]].map(([id, label]) => (
+          <button key={id} onClick={() => setActiveTab(id)} style={{ padding: "10px 20px", background: "none", border: "none", borderBottom: activeTab === id ? "2px solid var(--accent)" : "2px solid transparent", color: activeTab === id ? "var(--accent)" : "var(--text3)", fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.1em", cursor: "pointer", textTransform: "uppercase" }}>{label}</button>
+        ))}
+      </div>
+      <div className="page-content" style={{ display: activeTab !== "users" ? "none" : undefined }}>
           <div className="card"><div className="empty-state">You do not have permission to view this page.</div></div>
         </div>
       </div>
@@ -52,12 +75,18 @@ export default function Admin({ navigate }) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [d, s, a] = await Promise.all([api.getDevices(), api.getSummary(), api.getAlerts()]);
+      const [d, s, a, u] = await Promise.all([api.getDevices(), api.getSummary(), api.getAlerts(), api.getUsers(user.role)]);
       setDevices(d.data || []);
       setSummary(s.data || null);
+      setUsers((u.data || []).map((item) => ({
+        id: item.id,
+        username: String(item.username || "").trim(),
+        role: item.role || "user",
+        password: "",
+      })).filter((item) => item.username));
     } catch (e) { console.error(e); }
     setLoading(false);
-  }, []);
+  }, [user.role]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -112,21 +141,50 @@ export default function Admin({ navigate }) {
               <div key={u.username} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0" }}>
                 <div><strong>{u.username}</strong> <span style={{ color: "var(--text3)", fontFamily: "var(--mono)" }}>{u.role}</span></div>
                 <div>
-                  <button className="btn btn-ghost btn-sm" onClick={() => {
-                    const name = prompt("Username", u.username); if (!name) return;
+                  <button className="btn btn-ghost btn-sm" onClick={async () => {
+                    const name = prompt("Username", u.username)?.trim(); if (!name) return;
+                    if (userExists(users, name, u.username)) { alert("Username already exists"); return; }
                     const pass = prompt("Password (leave blank to keep)");
-                    const next = users.map(x => x.username===u.username ? { ...x, username: name, password: pass ? pass : x.password } : x);
-                    setUsers(next); saveUsers(next);
+                    const cleanPass = pass == null || pass === "" ? "" : pass.trim();
+                    const next = users.map(x => x.username===u.username ? { ...x, username: name, password: cleanPass || x.password } : x);
+                    try {
+                      if (u.id) await api.updateUser(u.id, { username: name, password: cleanPass, role: u.role }, user.role);
+                      await load();
+                    } catch (e) {
+                      console.error(e);
+                      setUsers(saveUsers(next));
+                    }
                   }}>Edit</button>
-                  <button className="btn btn-ghost btn-sm" onClick={() => { if (!confirm('Delete user?')) return; const next = users.filter(x => x.username !== u.username); setUsers(next); saveUsers(next); }}>Delete</button>
+                  <button className="btn btn-ghost btn-sm" onClick={async () => {
+                    if (!confirm('Delete user?')) return;
+                    const next = users.filter(x => x.username !== u.username);
+                    try {
+                      if (u.id) await api.deleteUser(u.id, user.role);
+                      await load();
+                    } catch (e) {
+                      console.error(e);
+                      setUsers(saveUsers(next));
+                    }
+                  }}>Delete</button>
                 </div>
               </div>
             ))}
             <div style={{ marginTop: 12 }}>
-              <button className="btn btn-primary btn-sm" onClick={() => {
-                const name = prompt('New username'); if (!name) return;
+              <button className="btn btn-primary btn-sm" onClick={async () => {
+                const name = prompt('New username')?.trim(); if (!name) return;
+                if (userExists(users, name)) { alert("Username already exists"); return; }
                 const pass = prompt('Password for user'); if (pass == null) return;
-                const next = [...users, { username: name, role: 'user', password: pass }]; setUsers(next); saveUsers(next);
+                const cleanPass = pass.trim();
+                if (!cleanPass) { alert("Password cannot be empty"); return; }
+                const next = [...users, { username: name, role: 'user', password: cleanPass }];
+                try {
+                  await api.addUser({ username: name, role: "user", password: cleanPass }, user.role);
+                  await load();
+                } catch (e) {
+                  console.error(e);
+                  alert(e.message || "Failed to save user on server. Saved locally only.");
+                  setUsers(saveUsers(next));
+                }
               }}>+ Add User</button>
             </div>
           </div>
@@ -166,6 +224,39 @@ export default function Admin({ navigate }) {
           </div>
         </div>
       </div>
+
+      {activeTab === "cmdlogs" && (
+        <div className="page-content">
+          <div className="card">
+            <div className="card-header">
+              <span>All Command Logs</span>
+              <button className="btn btn-ghost btn-sm" onClick={() => api.getAllCommandLogs().then((r) => setCmdLogs(r.data)).catch(() => {})}>↻ Refresh</button>
+            </div>
+            {cmdLogs.length === 0 ? (
+              <div className="empty-state"><div className="empty-state-text">No commands logged yet</div></div>
+            ) : (
+              <table className="data-table">
+                <thead><tr><th>Device</th><th>Command</th><th>Payload</th><th>Issued By</th><th>Status</th><th>Time</th></tr></thead>
+                <tbody>
+                  {cmdLogs.map((c) => (
+                    <tr key={c.id}>
+                      <td>
+                        <div style={{ color: "var(--text)", fontWeight: 500 }}>{c.device_name}</div>
+                        <div style={{ fontFamily: "var(--mono)", fontSize: 10, color: "var(--text3)" }}>{c.device_id}</div>
+                      </td>
+                      <td style={{ fontFamily: "var(--mono)", color: "var(--accent)", fontSize: 12, fontWeight: 700 }}>{c.command}</td>
+                      <td style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--text3)" }}>{c.payload ? JSON.stringify(c.payload).slice(0, 40) : "—"}</td>
+                      <td style={{ fontFamily: "var(--mono)", fontSize: 11 }}>{c.issued_by}</td>
+                      <td><span className={`status-badge ${c.status === "success" ? "online" : c.status === "failed" ? "critical" : "warning"}`}>{c.status}</span></td>
+                      <td style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--text3)" }}>{new Date(c.created_at).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

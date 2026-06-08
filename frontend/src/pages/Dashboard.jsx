@@ -5,6 +5,7 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart,
 
 export default function Dashboard({ navigate }) {
   const [summary, setSummary] = useState(null);
+  const [controlSummary, setControlSummary] = useState(null);
   const [devices, setDevices] = useState([]);
   const [alerts, setAlerts] = useState([]);
   const [liveFeed, setLiveFeed] = useState([]);
@@ -24,6 +25,11 @@ export default function Dashboard({ navigate }) {
     } catch (e) {
       console.error(e);
     }
+
+    try {
+      const cs = await api.getControlSummary();
+      setControlSummary(cs.data);
+    } catch (e) {}
 
     try {
       const net = await api.getNetwork();
@@ -101,12 +107,17 @@ export default function Dashboard({ navigate }) {
 
       <div className="page-content">
         {/* Stats */}
-        <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", marginBottom: 24 }}>
+        <div className="grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", marginBottom: 24 }}>
           <StatCard label="Total Devices" value={summary?.total_devices ?? "—"} desc="Registered endpoints" color="accent" />
-          <StatCard label="Online" value={summary?.online ?? "—"} desc="Actively reporting" color="green" />
-          <StatCard label="Warnings" value={(summary?.warning ?? 0) + (summary?.critical ?? 0)} desc="Need attention" color="yellow" />
+          <StatCard label="Online" value={controlSummary?.online ?? summary?.online ?? "—"} desc="Network reachable" color="green" />
+          <StatCard label="Offline" value={controlSummary?.offline ?? summary?.offline ?? "—"} desc="Unreachable" color="yellow" />
+          <StatCard label="Controlled" value={controlSummary?.controlled ?? "—"} desc="Devices powered ON" color="green" />
           <StatCard label="Alerts" value={summary?.unacked_alerts ?? 0} desc="Unacknowledged" color="red" />
-          <StatCard label="Readings / 24h" value={summary?.readings_24h ?? "—"} desc="Data points ingested" color="accent" />
+          <StatCard label="Commands Today" value={controlSummary?.cmd_today ?? "—"} desc="Control actions sent" color="accent" />
+          <StatCard label="Within Limits" value={summary?.devices_within_limits ?? 0} desc="Configured devices normal" color="green" />
+          <StatCard label="Near Limit" value={summary?.devices_near_limit ?? 0} desc="Warning threshold reached" color="yellow" />
+          <StatCard label="Exceeding Limits" value={summary?.devices_exceeding_limits ?? 0} desc="Outside configured range" color="red" />
+          <StatCard label="Critical Alerts" value={summary?.active_critical_alerts ?? 0} desc="Active critical limit alerts" color="red" />
         </div>
 
         <div className="card" style={{ marginBottom: 24 }}>
@@ -229,12 +240,21 @@ export default function Dashboard({ navigate }) {
           <table className="data-table">
             <thead>
               <tr>
-                <th>Device</th><th>Type</th><th>Location</th><th>Status</th><th>Last Seen</th>
+                <th>Device</th><th>Type</th><th>Location</th><th>Status</th><th>Control</th><th>Last Seen</th>
               </tr>
             </thead>
             <tbody>
-              {devices.map((d) => (
-                <tr key={d.id} style={{ cursor: "pointer" }} onClick={() => navigate("device-detail", d)}>
+              {devices.map((d) => {
+                const limitRisk = d.status === "critical" || d.status === "warning";
+                return (
+                <tr
+                  key={d.id}
+                  style={{
+                    cursor: "pointer",
+                    boxShadow: limitRisk ? `inset 3px 0 0 ${d.status === "critical" ? "var(--red)" : "var(--yellow)"}` : "none",
+                  }}
+                  onClick={() => navigate("device-detail", d)}
+                >
                   <td>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       <DeviceIcon type={d.type} />
@@ -247,9 +267,15 @@ export default function Dashboard({ navigate }) {
                   <td className="mono" style={{ textTransform: "uppercase", fontSize: 11 }}>{d.type}</td>
                   <td>{d.location || "—"}</td>
                   <td><span className={`status-badge ${d.status}`}>{d.status}</span></td>
+                  <td>
+                    <span style={{ fontFamily: "var(--mono)", fontSize: 10, fontWeight: 700, color: d.control_state === "on" ? "var(--green)" : "var(--text3)" }}>
+                      {d.control_state?.toUpperCase() || "—"}
+                    </span>
+                    {d.mode && <span style={{ fontFamily: "var(--mono)", fontSize: 9, color: "var(--text3)", marginLeft: 6 }}>{d.mode}</span>}
+                  </td>
                   <td className="mono">{d.minutes_since_seen != null ? `${d.minutes_since_seen}m ago` : "—"}</td>
                 </tr>
-              ))}
+              );})}
             </tbody>
           </table>
         </div>

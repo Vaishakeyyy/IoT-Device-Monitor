@@ -12,15 +12,21 @@ export default function Login({ navigate }) {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
-    const res = login(username.trim(), password.trim());
-    if (res && res.success) {
-      navigate("dashboard");
-    } else {
-      setError(res?.error || "Login failed");
+    setLoading(true);
+    try {
+      const res = await login(username, password);
+      if (res && res.success) {
+        navigate("dashboard");
+      } else {
+        setError(res?.error || "Login failed");
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -67,7 +73,7 @@ export default function Login({ navigate }) {
         {error && <div style={{ color: "var(--danger)", fontSize: 14 }}>{error}</div>}
 
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <button className="btn btn-primary" type="submit">Sign in</button>
+          <button className="btn btn-primary" type="submit" disabled={loading}>{loading ? "Signing in..." : "Sign in"}</button>
           <button className="btn btn-ghost" type="button" onClick={() => navigate('dashboard')}>Back</button>
         </div>
       </form>

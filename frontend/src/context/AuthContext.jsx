@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from "react";
+import { api } from "../api";
 
 const SAMPLE_USERS = [
   { username: "admin", password: "adminpass", role: "admin" },
@@ -9,11 +10,12 @@ const SAMPLE_ASSIGNMENTS = { "DEV-001": "alice" };
 
 const AuthContext = createContext(null);
 
-function normalizeUsers(users) {
+export function normalizeUsers(users) {
   if (!Array.isArray(users)) return SAMPLE_USERS.slice();
   const normalized = users
     .filter(Boolean)
     .map((user) => ({
+      id: user.id,
       username: String(user.username || "").trim(),
       password: String(user.password || "").trim(),
       role: user.role || "user"
@@ -65,11 +67,25 @@ export function AuthProvider({ children }) {
   const loginAs = (role, username = role === "admin" ? "admin" : "user") => setUser({ username, role });
   const logout = () => setUser({ username: "guest", role: "user" });
 
-  const login = (username, password) => {
+  const login = async (username, password) => {
+    const normalizedUsername = String(username || "").trim();
+    const normalizedPassword = String(password || "").trim();
+
+    try {
+      const res = await api.loginUser({ username: normalizedUsername, password: normalizedPassword });
+      const nextUser = { username: res.data.username, role: res.data.role };
+      try { localStorage.setItem("iot-user", JSON.stringify(nextUser)); } catch (e) {}
+      setUser(nextUser);
+      return { success: true, role: nextUser.role };
+    } catch (apiError) {
+      console.warn("Backend login unavailable or failed, checking local users", apiError);
+    }
+
     try {
       seedSampleData();
       const users = normalizeUsers(JSON.parse(localStorage.getItem("iot-users") || "[]"));
-      const found = users.find((u) => u.username === username && u.password === password);
+      localStorage.setItem("iot-users", JSON.stringify(users));
+      const found = users.find((u) => u.username === normalizedUsername && u.password === normalizedPassword);
       if (found) {
         const nextUser = { username: found.username, role: found.role };
         try { localStorage.setItem("iot-user", JSON.stringify(nextUser)); } catch (e) {}
